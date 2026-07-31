@@ -1,0 +1,172 @@
+{
+  "note": "Regenerate with tests/test_regression.py::record_reference.",
+  "scenarios": {
+    "free_flow": {
+      "collisions": 0,
+      "lane_changes": 0,
+      "aborted_changes": 0,
+      "state_sequence": [
+        "keep_lane"
+      ],
+      "veto_reasons": [],
+      "lanes_visited": [
+        0
+      ],
+      "record_count": 601,
+      "mean_speed": 28.43422743182056,
+      "distance": 1706.8970686524158,
+      "minimum_time_headway": null,
+      "minimum_time_to_collision": null,
+      "ttc_samples": 0
+    },
+    "slow_leader": {
+      "collisions": 0,
+      "lane_changes": 2,
+      "aborted_changes": 0,
+      "state_sequence": [
+        "prepare_lane_change_left",
+        "lane_change_left",
+        "keep_lane",
+        "prepare_lane_change_right",
+        "lane_change_right",
+        "keep_lane"
+      ],
+      "veto_reasons": [],
+      "lanes_visited": [
+        0,
+        1
+      ],
+      "record_count": 601,
+      "mean_speed": 28.33856193034709,
+      "distance": 1700.3475720138604,
+      "minimum_time_headway": 1.9591252498770875,
+      "minimum_time_to_collision": 6.875,
+      "ttc_samples": 28
+    },
+    "blocked_overtake": {
+      "collisions": 0,
+      "lane_changes": 0,
+      "aborted_changes": 0,
+      "state_sequence": [
+        "keep_lane"
+      ],
+      "veto_reasons": [],
+      "lanes_visited": [
+        0
+      ],
+      "record_count": 601,
+      "mean_speed": 20.299633978378175,
+      "distance": 1217.2080021005283,
+      "minimum_time_headway": 1.8664040270074171,
+      "minimum_time_to_collision": 6.875,
+      "ttc_samples": 200
+    },
+    "gap_wait": {
+      "collisions": 0,
+      "lane_changes": 1,
+      "aborted_changes": 4,
+      "state_sequence": [
+        "keep_lane",
+        "prepare_lane_change_left",
+        "keep_lane",
+        "prepare_lane_change_left",
+        "keep_lane",
+        "prepare_lane_change_left",
+        "keep_lane",
+        "prepare_lane_change_left",
+        "keep_lane",
+        "prepare_lane_change_left",
+        "lane_change_left",
+        "keep_lane",
+        "prepare_lane_change_right",
+        "lane_change_right"
+      ],
+      "veto_reasons": [
+        "follower_deceleration",
+        "follower_time_to_collision",
+        "follower_gap"
+      ],
+      "lanes_visited": [
+        0,
+        1
+      ],
+      "record_count": 601,
+      "mean_speed": 19.66842699519102,
+      "distance": 1179.4724624109804,
+      "minimum_time_headway": 1.8196570902916485,
+      "minimum_time_to_collision": 8.125,
+      "ttc_samples": 433
+    },
+    "light_traffic": {
+      "collisions": 0,
+      "lane_changes": 1,
+      "aborted_changes": 0,
+      "state_sequence": [
+        "keep_lane",
+        "prepare_lane_change_left",
+        "lane_change_left",
+        "keep_lane"
+      ],
+      "veto_reasons": [],
+      "lanes_visited": [
+        0,
+        1
+      ],
+      "record_count": 601,
+      "mean_speed": 25.008532573893,
+      "distance": 1500.8128076909693,
+      "minimum_time_headway": 2.753092709167907,
+      "minimum_time_to_collision": 30.47132974436747,
+      "ttc_samples": 578
+    },
+    "dense_traffic": {
+      "collisions": 0,
+      "lane_changes": 1,
+      "aborted_changes": 0,
+      "state_sequence": [
+        "keep_lane",
+        "prepare_lane_change_left",
+        "lane_change_left",
+        "keep_lane"
+      ],
+      "veto_reasons": [],
+      "lanes_visited": [
+        0,
+        1
+      ],
+      "record_count": 601,
+      "mean_speed": 20.32556374033667,
+      "distance": 1219.566380794234,
+      "minimum_time_headway": 1.8700490609601432,
+      "minimum_time_to_collision": 27.314698962158143,
+      "ttc_samples": 564
+    },
+    "slow_right_lane": {
+      "collisions": 0,
+      "lane_changes": 3,
+      "aborted_changes": 0,
+      "state_sequence": [
+        "prepare_lane_change_left",
+        "lane_change_left",
+        "keep_lane",
+        "prepare_lane_change_right",
+        "lane_change_right",
+        "keep_lane",
+        "prepare_lane_change_left",
+        "lane_change_left",
+        "keep_lane"
+      ],
+      "veto_reasons": [],
+      "lanes_visited": [
+        0,
+        1
+      ],
+      "record_count": 601,
+      "mean_speed": 26.273693784780882,
+      "distance": 1576.848996465331,
+      "minimum_time_headway": 3.176961027422384,
+      "minimum_time_to_collision": 13.09297275877238,
+      "ttc_samples": 113
+    }
+  }
+}
