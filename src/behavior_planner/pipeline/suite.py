@@ -8,17 +8,51 @@ following model or a gate is a change to this module and to nothing else.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from behavior_planner.algorithm.base import BehaviorPolicy
 from behavior_planner.algorithm.cost import WeightedCostModel
 from behavior_planner.algorithm.idm import IntelligentDriverModel
 from behavior_planner.algorithm.planner import FiniteStateBehaviorPlanner, KeepLaneBaseline
 from behavior_planner.algorithm.safety import GapAndDecelerationGate
 from behavior_planner.model.config import PlannerConfig
-from behavior_planner.pipeline.scenarios import Scenario, standard_suite
+from behavior_planner.pipeline.scenarios import (
+    SWEEP_DENSITIES,
+    SWEEP_SEEDS,
+    Scenario,
+    standard_suite,
+    sweep_scenarios,
+)
 from behavior_planner.pipeline.simulator import SimulationConfig, TrafficSimulator
 from behavior_planner.pipeline.trace import RunTrace
 
-__all__ = ["build_planner", "build_simulator", "run_baseline", "run_scenario", "run_suite"]
+__all__ = [
+    "DensityGroup",
+    "build_planner",
+    "build_simulator",
+    "run_baseline",
+    "run_scenario",
+    "run_suite",
+    "run_sweep",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class DensityGroup:
+    """Every run made at one traffic density.
+
+    The density is carried beside the traces rather than parsed back out of
+    their names, so a consumer of a sweep never has to recover a number from a
+    string.
+    """
+
+    density: int
+    traces: tuple[RunTrace, ...]
+
+    def __post_init__(self) -> None:
+        """Reject a group with nothing in it, which no distribution is defined on."""
+        if not self.traces:
+            raise ValueError(f"density {self.density} produced no runs")
 
 
 def build_planner(config: PlannerConfig) -> FiniteStateBehaviorPlanner:
@@ -99,3 +133,34 @@ def run_suite(
         runner(scenario, config=config, simulation=simulation, steps=steps)
         for scenario in chosen
     )
+
+
+def run_sweep(
+    *,
+    densities: tuple[int, ...] = SWEEP_DENSITIES,
+    seeds: tuple[int, ...] = SWEEP_SEEDS,
+    duration: float = 60.0,
+    config: PlannerConfig | None = None,
+    simulation: SimulationConfig | None = None,
+    baseline: bool = False,
+) -> tuple[DensityGroup, ...]:
+    """Run the density and seed grid, grouped by density.
+
+    One scenario run once says what happened. A grid of seeds at each of several
+    densities says what happens, which is the difference between a demonstration
+    and a measurement.
+    """
+    runner = run_baseline if baseline else run_scenario
+    groups: list[DensityGroup] = []
+    for per_lane in densities:
+        scenarios = sweep_scenarios(densities=(per_lane,), seeds=seeds, duration=duration)
+        groups.append(
+            DensityGroup(
+                density=per_lane,
+                traces=tuple(
+                    runner(scenario, config=config, simulation=simulation)
+                    for scenario in scenarios
+                ),
+            )
+        )
+    return tuple(groups)

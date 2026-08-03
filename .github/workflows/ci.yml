@@ -29,8 +29,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
+      # The threshold is the measured figure of 97 percent, rounded down and
+      # reduced by two, so an ordinary refactor does not fail the build and a
+      # module arriving without tests does. Figures are never compared byte for
+      # byte: matplotlib output is not reproducible across platforms or font
+      # sets, so the tests check that the command writes them and that they are
+      # valid PNGs inside the size budget.
       - name: Run tests
-        run: uv run pytest -q
+        run: >
+          uv run pytest -q --cov=src/behavior_planner
+          --cov-report=term-missing --cov-fail-under=95
 
       - name: Lint
         run: uv run ruff check .

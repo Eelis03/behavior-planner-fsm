@@ -17,7 +17,28 @@ from behavior_planner.model.config import DriverParams, IdmParams, MobilParams
 from behavior_planner.model.road import Road
 from behavior_planner.model.vehicle import EGO_ID, Vehicle, VehicleShape
 
-__all__ = ["RandomFill", "Scenario", "VehicleSpec", "build_vehicles", "standard_suite"]
+__all__ = [
+    "SWEEP_DENSITIES",
+    "SWEEP_SEEDS",
+    "RandomFill",
+    "Scenario",
+    "VehicleSpec",
+    "build_vehicles",
+    "standard_suite",
+    "sweep_scenarios",
+]
+
+SWEEP_DENSITIES: tuple[int, ...] = (4, 8, 12, 16, 20)
+"""Vehicles per lane swept, from nearly empty to the edge of congestion.
+
+Four per lane on a 1200 m ring is a vehicle every 300 m, which is free flow.
+Twenty is one every 60 m, which at 22 m/s is under three seconds of headway and
+is the density at which a lane change stops being worth taking.
+"""
+
+SWEEP_SEEDS: tuple[int, ...] = (101, 102, 103, 104, 105, 106, 107, 108)
+"""Seeds drawn per density. Eight is enough for a five number summary and small
+enough that the whole sweep stays inside a minute."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +240,55 @@ def _too_close(
         if abs(road.separation(other_s, s)) < required:
             return True
     return False
+
+
+def sweep_scenarios(
+    *,
+    densities: tuple[int, ...] = SWEEP_DENSITIES,
+    seeds: tuple[int, ...] = SWEEP_SEEDS,
+    duration: float = 60.0,
+) -> tuple[Scenario, ...]:
+    """The grid of randomly filled scenarios the density sweep runs.
+
+    Everything except the density and the seed is held fixed, so a difference
+    between two cells of the grid is a difference of traffic and nothing else.
+    The mean free flow speed and the per-lane speed gradient stay at the values
+    ``light_traffic`` uses, which is what makes the sweep an extension of that
+    scenario rather than a separate experiment.
+
+    The name of each scenario carries its density and its seed, so a run is
+    identifiable from its trace alone.
+    """
+    if not densities:
+        raise ValueError("a sweep needs at least one density")
+    if not seeds:
+        raise ValueError("a sweep needs at least one seed")
+    if any(value <= 0 for value in densities):
+        raise ValueError(f"densities must be positive, got {densities}")
+
+    road = Road(lane_count=3, length=1200.0)
+    return tuple(
+        Scenario(
+            name=f"density_{per_lane:02d}_seed_{seed}",
+            description=(
+                f"{per_lane} vehicles per lane on a three lane ring, seed {seed}. "
+                "The traffic changes lane under MOBIL."
+            ),
+            road=road,
+            ego=VehicleSpec(lane=0, s=0.0, speed=22.0, desired_speed=31.0),
+            duration=duration,
+            seed=seed,
+            fill=RandomFill(
+                lanes=(0, 1, 2),
+                per_lane=per_lane,
+                speed_mean=22.0,
+                speed_gradient=3.0,
+                speed_sigma=2.0,
+            ),
+        )
+        for per_lane in densities
+        for seed in seeds
+    )
 
 
 def standard_suite() -> tuple[Scenario, ...]:

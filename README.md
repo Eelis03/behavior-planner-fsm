@@ -1,111 +1,197 @@
-# Behavior Planner Fsm
+# behavior-planner-fsm
 
-Finite state machine and cost-based lane change decisions on a highway traffic simulation.
+Lane change decisions from a finite state machine and a cost function, on a highway
+traffic simulation in which the surrounding vehicles follow the Intelligent Driver Model
+and choose their own lanes with MOBIL.
 
 [![CI](https://github.com/Eelis03/behavior-planner-fsm/actions/workflows/ci.yml/badge.svg)](https://github.com/Eelis03/behavior-planner-fsm/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## Overview
+![Cost preference for a lane change rises by a factor of 1140 as the progress weight goes from 5 to 5000, while the safety gate refuses the manoeuvre at every one of the ten weights and the planner never takes it](docs/figures/gate_weight_sweep.png)
 
-A behaviour planner for a highway vehicle: a five state machine over keeping lane,
-preparing a change left or right, and executing a change left or right, driven by a
-weighted cost function and constrained by a safety gate that can refuse any manoeuvre the
-cost function asks for. It runs against a microscopic traffic simulation in which the
-surrounding vehicles follow the Intelligent Driver Model longitudinally and choose their
-own lanes with MOBIL, so the gaps the planner reasons about are contested rather than
-handed to it. The intended reader is someone building or reviewing a decision layer, who
-needs to see where the boundary between ranking manoeuvres and permitting them is drawn,
-and what happens at that boundary.
+## The safety gate is not a cost term
 
-## Problem
+A weighted cost function computes `w1 * c1 + w2 * c2 + ...`, and every term in that sum is
+negotiable by construction. If safety appears as `w_safety * c_safety`, then for any finite
+`w_safety` there is a progress advantage large enough to outweigh it. That is not a tuning
+error to be avoided by choosing `w_safety` carefully. It is what addition means, and the
+situations in which the progress advantage is largest, a slow obstruction ahead and a fast
+lane beside it, are exactly the situations in which the trade must not be available.
 
-A vehicle on a multi-lane road has to decide, repeatedly and quickly, whether to stay in
-its lane or move to another one. The decision is not a continuous optimisation. It is a
-choice among a small number of discrete manoeuvres, each of which commits the vehicle for
-several seconds, and each of which is either legal from the current behaviour state or is
-not. Four things are in tension:
+So safety is not a term here. It is a separate object, `GapAndDecelerationGate`, with its
+own thresholds in its own dataclass, which returns a named verdict rather than a number and
+is applied before any cost is compared. The claim is that this changes the behaviour of the
+planner in a way no weight can reproduce. `examples/run_gate_experiment.py` is the
+experiment that tests it.
 
-1. Progress. A slow vehicle ahead costs speed, and a faster lane recovers it.
-2. Safety. A gap that is large enough to fit in is not necessarily large enough to enter.
-3. Comfort. Lateral effort has a cost, and so does changing one's mind repeatedly.
-4. Lane discipline. Keeping right is a rule of the road, not a preference to be traded
-   away whenever the left lane is marginally faster.
+The scene is fixed. The ego does 18 m/s behind a leader whose centre is 25 m ahead doing
+15 m/s, so the progress term prefers the lane to its left. That lane is occupied: a vehicle
+sits 1.5 m behind the ego, well inside its 5 m body length, in the space the manoeuvre would
+move into. The soft safety weight is set to zero, which is the misconfiguration a separate
+gate exists to survive. Only the progress weight moves, from its default of 5 to a thousand
+times that.
 
-Three properties separate a usable behaviour planner from a scoring function.
+| Progress weight | Keep lane cost | Lane change cost | Cost prefers | Gate | Planner takes it |
+| --------------- | -------------- | ---------------- | ------------ | ---- | ---------------- |
+| 5               | 2.1505         | 0.2650           | the change   | refused, `occupied` | no |
+| 50              | 21.5054        | 0.2650           | the change   | refused, `occupied` | no |
+| 500             | 215.0538       | 0.2650           | the change   | refused, `occupied` | no |
+| 5000            | 2150.5376      | 0.2650           | the change   | refused, `occupied` | no |
 
-*The state machine must be total and explicit.* Every combination of current state and
-input has to have a defined response. A machine that silently ignores an input it does
-not recognise turns a planner bug into a vehicle that inexplicably never changes lane.
+Ten weights are swept, of which four are shown. At every one of them the cost function ranks
+the lane change first, at every one of them the gate refuses it, and at none of them does the
+planner take it. The cost preference for the manoeuvre grows by a factor of 1140 across the
+sweep, which is the figure above: a straight line on log axes over the verdict that does not
+move. A cost term could not produce that plot. Somewhere along the horizontal axis it would
+have to cross.
 
-*Safety must not be a cost term.* A weighted sum has no veto. If safety is a large
-penalty, a large enough speed advantage outweighs it, and the situation in which that
-happens is precisely the situation in which it must not. The failure needs no mistuning
-to appear: it is a property of addition.
+The soft safety term in the cost function is not redundant with the gate, and the difference
+is measurable rather than asserted. Run the same sweep with `--safety-weight 1.5` and the
+lane change costs 1.7650 instead of 0.2650, which is enough to change which permitted
+candidate the planner picks at the default progress weight. Not one verdict moves.
+`tests/test_gate_experiment.py` asserts both halves of that. The cost term makes the planner
+polite. The gate makes it safe. Only one of the two is load bearing.
 
-*Surrounding traffic must not be passive.* If the traffic holds its lane and its speed,
-every gap the planner sees is still there when it arrives, and the planner is being
-tested against a problem that does not exist.
+## The state machine
 
-## Approach
+Five states, over keeping lane, preparing a change left or right, and executing a change
+left or right; six events; thirty pairs. `algorithm/fsm.py` declares the legal pairs in
+`TRANSITIONS` and the illegal pairs in `REJECTED`, and a check that runs at import refuses
+to load the module unless the two are disjoint and their union is the whole product. A pair
+that is neither declared legal nor declared illegal is an error the moment the module loads,
+not a surprise in a scenario nobody ran.
 
-The traffic is microscopic. Longitudinal behaviour comes from the Intelligent Driver
-Model of Treiber, Hennecke and Helbing, whose acceleration
+An illegal pair raises `IllegalTransitionError`. It does not return the current state. The
+silent version produces a vehicle that quietly does nothing, which is indistinguishable from
+a vehicle that has correctly decided to do nothing, and that is a bug which survives review.
 
-```
-a = a_max * (1 - (v / v0)^delta - (s_star / s)^2),
-s_star = s0 + max(0, v * T + v * dv / (2 * sqrt(a_max * b))),
-```
+The two prepare states are not decoration. A vehicle that wants a gap in the next lane has
+to adjust its longitudinal behaviour first, and the prepare state is where that adjustment
+lives: in `PREPARE_LANE_CHANGE_LEFT` the ego follows the more restrictive of its own leader
+and the target lane's leader, so it drops back rather than driving past the gap it wants.
+The cost function scores a prepare state on the mean of the lane it is aiming at and the lane
+it is still in, which is what stops the machine from parking in a prepare state and
+collecting the target lane's benefit without paying for the manoeuvre.
 
-is collision free for a leader that does not brake harder than `b`, and whose parameters
-are those of the paper's highway calibration. Lane choice for the traffic comes from
-MOBIL, by Kesting, Treiber and Helbing, which accepts a change when the new follower is
-not forced below `-b_safe` and when
+Around the machine, four layers, each importing only from the ones above it.
 
-```
-a_c' - a_c + p * ((a_n' - a_n) + (a_o' - a_o)) > delta_a_th
-```
+| Layer | What is in it |
+| --- | --- |
+| `model/` | Pure data: road geometry, vehicle and lane change, the two state alphabets, every tunable number, the traffic snapshot, the decision records. No input or output, and no knowledge of planners. |
+| `algorithm/` | The five Protocols, the Intelligent Driver Model, MOBIL, the transition table, the weighted cost, the safety gate, the trajectory generator. Draws nothing and writes nothing. |
+| `pipeline/` | The scenarios, the density sweep grid, the synchronous simulator, the run trace, the gate experiment, and the one module where concrete implementations are chosen. |
+| `analysis/` | Metrics, Markdown tables and the three figures. Reads what the pipeline produced and nothing else. |
 
-holds, with `p` the politeness factor. Politeness is what makes the traffic interesting:
-at the default of 0.25 a slow leader will sometimes pull aside for a faster follower and
-sometimes not, so a gap is a thing that has to be caught rather than a thing that waits.
+Substituting `KeepLaneBaseline()` for the default policy, or a different cost model or gate,
+is a change to `pipeline/suite.py` and to nothing else.
 
-The ego vehicle is planned in three separated layers.
+## Results
 
-*The finite state machine* declares its transition table over the full product of five
-states and six events. The legal and the rejected pairs are both written out, and an
-import time check refuses to load the module unless the two partition the product
-exactly. An illegal pair raises rather than returning the current state, so the machine
-has no silent no-op.
+Produced on Python 3.12.10 with numpy 2.5.1 and matplotlib 3.11.1, on one core of an AMD64
+desktop under Windows 11. Every run uses a 1200 metre three lane ring at an integration step
+of 0.1 seconds. The behaviour layer plans at 2 Hz, the traffic consults MOBIL at 1 Hz, and a
+lane change takes 3.5 seconds.
 
-*The cost function* scores the feasible successors on four terms, each normalised to
-`[0, 1]` before weighting: progress, measured as the speed shortfall a lane can deliver;
-safety, measured as the shortfall against its own desired gaps; comfort, measured as the
-lateral effort of the state; and lane preference, measured as distance from the preferred
-lane. A prepare state is scored on the mean of the lane it is aiming at and the lane it
-is still in, which is what stops the machine from parking in a prepare state and
-collecting the target lane's benefit without paying for the manoeuvre. Every weight and
-every scale is a documented field of `CostConfig`.
+### Seven scripted scenarios
 
-*The safety gate* is a separate object with its own thresholds and its own constructor.
-It returns a verdict, not a number, and a vetoed candidate is removed from the set before
-any cost is compared. It refuses a manoeuvre that leaves the road, that moves into a
-space a vehicle already occupies, that would leave less than
-`minimum_gap + headway * speed` to the leader or the follower in the target lane, that
-would leave less than three seconds to collision with either, or that would force the new
-follower to brake harder than three metres per second squared. The last of these is
-MOBIL's own safety criterion applied to the ego, which holds the ego to the standard the
-traffic is held to.
+From `uv run python examples/run_suite.py`, which takes about 2.6 seconds.
 
-Trajectory generation follows the Frenet frame formulation of Werling and colleagues,
-with the lateral transition as the minimum jerk quintic and the longitudinal profile from
-forward integrating the car following model. The quintic's peak rate, acceleration and
-jerk are available in closed form, so the comfort of a manoeuvre is checked rather than
-sampled.
+| Scenario         | Collisions | Mean speed (m/s) | Distance (m) | Lane changes | Min headway (s) | Min TTC (s) | TTC p05 (s) | TTC median (s) |
+| ---------------- | ---------- | ---------------- | ------------ | ------------ | --------------- | ----------- | ----------- | -------------- |
+| free_flow        | 0          | 28.43            | 1707         | 0            | inf             | inf         | inf         | inf            |
+| slow_leader      | 0          | 28.34            | 1700         | 2            | 1.96            | 6.88        | 7.36        | 12.24          |
+| blocked_overtake | 0          | 20.30            | 1217         | 0            | 1.87            | 6.88        | 10.69       | 211.40         |
+| gap_wait         | 0          | 19.67            | 1179         | 1            | 1.82            | 8.12        | 12.86       | 259.42         |
+| light_traffic    | 0          | 25.01            | 1501         | 1            | 2.75            | 30.47       | 30.59       | 38.19          |
+| dense_traffic    | 0          | 20.33            | 1220         | 1            | 1.87            | 27.31       | 27.76       | 38.35          |
+| slow_right_lane  | 0          | 26.27            | 1577         | 3            | 3.18            | 13.09       | 13.29       | 14.84          |
 
-`docs/design-notes.md` records the alternatives that were considered and rejected, the
-conditions under which this planner gives poor results, and what a hand-tuned cost
-function cannot do however carefully it is tuned.
+Against a control policy identical in every respect except that it never leaves its lane:
+
+| Scenario         | Planner speed (m/s) | Baseline speed (m/s) | Gain (percent) | Lane changes |
+| ---------------- | ------------------- | -------------------- | -------------- | ------------ |
+| free_flow        | 28.43               | 28.43                | +0.0           | 0            |
+| slow_leader      | 28.34               | 20.30                | +39.6          | 2            |
+| blocked_overtake | 20.30               | 20.30                | +0.0           | 0            |
+| gap_wait         | 19.67               | 18.54                | +6.1           | 1            |
+| light_traffic    | 25.01               | 24.25                | +3.1           | 1            |
+| dense_traffic    | 20.33               | 20.03                | +1.5           | 1            |
+| slow_right_lane  | 26.27               | 18.39                | +42.9          | 3            |
+
+Over the seven: 0 collisions, 8 lane changes, a mean ego speed of 24.05 m/s, a smallest time
+headway of 1.82 s and a smallest time to collision of 6.88 s. The gate raised three distinct
+veto reasons, `follower_gap`, `follower_time_to_collision` and `follower_deceleration`.
+
+The benefit is where the opportunity is. The two scenarios with a clear lane beside a slow
+obstruction gain 39.6 and 42.9 percent, most of the way to the free flow speed of 28.43 m/s.
+The two with no usable gap gain nothing: `free_flow` has nothing to overtake and
+`blocked_overtake` has nowhere to go. A planner that gained speed in `blocked_overtake`
+would be taking gaps it should not have.
+
+![Ego speed, lateral offset and behaviour state through the slow_leader run, showing the prepare state, arrival in lane 1 at four seconds, the recovery from 21.36 to 31 metres per second while passing, and the return to lane 0 at 22.5 seconds](docs/figures/slow_leader_timeline.png)
+
+That is the whole decision sequence of `slow_leader` on one time axis: the approach that
+takes the ego down to 21.36 m/s, the prepare state, the crossing that finishes at 4.0
+seconds, the recovery towards its 31 m/s free flow speed while passing, and the return to
+lane 0 at 22.5 seconds once the obstruction is behind. No column of the table above contains
+it.
+
+### Waiting has a price, and the gate makes the planner pay it
+
+![Ego speed, lateral offset and behaviour state through the gap_wait run, with crosses marking the twenty one planning cycles on which the safety gate refused a lane change before a usable gap arrived at forty one seconds](docs/figures/gap_wait_timeline.png)
+
+`gap_wait` is the same three panels and the opposite outcome. The ego sits behind a leader
+doing 18 m/s while faster traffic streams past on its left. It enters the prepare state at
+4.5, 12.5, 21.5 and 31.0 seconds and abandons the attempt each time on `follower_gap`, at
+6.5, 15.0, 24.5 and 34.0 seconds. A usable gap arrives at 41.0 seconds, the change commits,
+and it completes at 44.5. Twenty one planning cycles carry a veto in total. The 6.1 percent
+gain in the table is the value of one lane change taken 36.5 seconds after the cost function
+first asked for it. `uv run python examples/run_scenario.py --scenario gap_wait
+--transitions-only` prints that sequence as text.
+
+### Forty randomly filled runs, which say something the seven do not
+
+Seven scenarios each run once at one seed demonstrate the behaviours. They do not
+characterise the planner, and until recently this repository listed that gap as a known
+limitation. `uv run python examples/run_sweep.py` closes it: five densities, eight seeds
+each, both policies, 80 runs in about 30 seconds. Only the density and the seed vary.
+
+| Vehicles per lane | Runs | Collisions | Speed p05 (m/s) | Speed median (m/s) | Speed p95 (m/s) | Median gain (percent) | Mean gain (percent) | Lane changes |
+| ----------------- | ---- | ---------- | --------------- | ------------------ | --------------- | --------------------- | ------------------- | ------------ |
+| 4                 | 8    | 0          | 25.45           | 26.88              | 27.98           | +0.0                  | +0.5                | 2            |
+| 8                 | 8    | 0          | 21.54           | 23.99              | 25.70           | +0.0                  | -0.7                | 7            |
+| 12                | 8    | 0          | 21.20           | 22.79              | 23.98           | +0.0                  | +2.7                | 7            |
+| 16                | 8    | 0          | 16.76           | 20.65              | 21.87           | +0.0                  | -4.7                | 9            |
+| 20                | 8    | 0          | 12.53           | 19.65              | 22.25           | +0.0                  | -8.9                | 7            |
+
+Three things come out of it, and two of them are unflattering.
+
+The required result holds. Zero collisions involving the ego across all 40 planner runs and
+all 40 control runs. One overlap occurred anywhere in the 80: two traffic vehicles, not the
+ego, at 20 vehicles per lane under the control policy. The trace separates the two counts, so
+a collision between two traffic vehicles cannot be reported as a planner success or hide
+behind one.
+
+The speed benefit does not generalise. The median paired gain is +0.0 percent at every
+density, because in most random fills the planner finds no gap worth taking and behaves
+exactly like the control. The mean is positive at 4 and 12 vehicles per lane and negative at
+8, 16 and 20, reaching -8.9 percent at the highest density. The sweep names its worst run:
+`density_20_seed_102`, at -47.8 percent against the control on the same seed, where the ego
+averaged 11.07 m/s after two lane changes and two abandoned ones. The lowest ego speed
+anywhere in the planner runs is 0.00 m/s and the lowest under the control is 8.09 m/s, so
+that density is congested for both policies and only the planner came to a stop. This is the
+memoryless progress term behaving exactly as `docs/design-notes.md` predicts it must: it
+measures an instantaneous speed shortfall over a 120 m horizon and cannot tell a lane change
+worth 2 m/s for ten seconds from one worth 2 m/s for two.
+
+The margins are thinner than the scripted suite suggests. The smallest time headway over the
+40 planner runs is 0.72 s against 1.82 s over the seven scenarios, and the smallest time to
+collision is 0.75 s against 6.88 s. Those are the ego following its leader under the car
+following model rather than the gate permitting anything: the gate governs lane changes and
+has no authority over how closely the ego follows in its own lane. The number is still
+evidence that the seven hand built scenarios sample an easier part of the space than random
+traffic does.
 
 ## Installation
 
@@ -114,7 +200,7 @@ Requires Python 3.12 or later.
 ```bash
 git clone https://github.com/Eelis03/behavior-planner-fsm.git
 cd behavior-planner-fsm
-uv sync
+uv sync --all-extras --dev
 ```
 
 Using pip instead of uv:
@@ -125,7 +211,8 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
-## Usage
+The package ships `py.typed`, so a project that installs it gets the annotations rather than
+`Any`.
 
 ```python
 from behavior_planner import Road, Scenario, VehicleSpec, run_scenario, scenario_metrics
@@ -148,155 +235,80 @@ print([state.value for state in trace.state_sequence])
 #  'prepare_lane_change_right', 'lane_change_right', 'keep_lane']
 ```
 
-The ego moves left, passes, and returns right. Substituting `KeepLaneBaseline()` for the
-default policy, or a different cost model or safety gate, requires no other change: all
-of them are reached through the Protocols in `behavior_planner.algorithm.base`.
+## Reproducing every number here
 
-Runnable examples live in `examples/`:
+Four scripts, each printing the numbers quoted above.
 
 ```bash
-uv run python examples/run_suite.py
+uv run python examples/run_gate_experiment.py                            # the opening claim
+uv run python examples/run_suite.py                                      # the two scenario tables
 uv run python examples/run_scenario.py --scenario gap_wait --transitions-only
-uv run python examples/plot_results.py
+uv run python examples/run_sweep.py                                      # the density sweep
 ```
 
-The first produces the tables below. The second prints the decision timeline of one
-scenario. The third writes the figures into `outputs/`.
+`run_scenario.py` accepts any of the seven scenario names and prints that run's decision
+timeline and its metrics, including the minimum speed quoted for `slow_leader` above.
 
-## Results
-
-Produced by `uv run python examples/run_suite.py`, on Python 3.12.10 with numpy 2.5.1 and
-matplotlib 3.11.1, on one core of an AMD64 desktop under Windows 11. Every scenario runs
-for 60 seconds on a 1200 metre three lane ring at an integration step of 0.1 seconds. The
-behaviour layer plans at 2 Hz, the traffic consults MOBIL at 1 Hz, and a lane change takes
-3.5 seconds. The whole run takes about 2.4 seconds.
-
-| Scenario         | Collisions | Mean speed (m/s) | Distance (m) | Lane changes | Min headway (s) | Min TTC (s) | TTC p05 (s) | TTC median (s) |
-| ---------------- | ---------- | ---------------- | ------------ | ------------ | --------------- | ----------- | ----------- | -------------- |
-| free_flow        | 0          | 28.43            | 1707         | 0            | inf             | inf         | inf         | inf            |
-| slow_leader      | 0          | 28.34            | 1700         | 2            | 1.96            | 6.88        | 7.36        | 12.24          |
-| blocked_overtake | 0          | 20.30            | 1217         | 0            | 1.87            | 6.88        | 10.69       | 211.40         |
-| gap_wait         | 0          | 19.67            | 1179         | 1            | 1.82            | 8.12        | 12.86       | 259.42         |
-| light_traffic    | 0          | 25.01            | 1501         | 1            | 2.75            | 30.47       | 30.59       | 38.19          |
-| dense_traffic    | 0          | 20.33            | 1220         | 1            | 1.87            | 27.31       | 27.76       | 38.35          |
-| slow_right_lane  | 0          | 26.27            | 1577         | 3            | 3.18            | 13.09       | 13.29       | 14.84          |
-
-Over the seven scenarios: 0 collisions, 8 lane changes, a mean ego speed of 24.05 m/s, a
-smallest time headway of 1.82 s and a smallest time to collision of 6.88 s. The safety
-gate raised three distinct veto reasons during the suite: `follower_gap`,
-`follower_time_to_collision` and `follower_deceleration`.
-
-Mean ego speed against a control policy that is identical in every respect except that it
-never leaves its lane:
-
-| Scenario         | Planner speed (m/s) | Baseline speed (m/s) | Gain (percent) | Lane changes |
-| ---------------- | ------------------- | -------------------- | -------------- | ------------ |
-| free_flow        | 28.43               | 28.43                | +0.0           | 0            |
-| slow_leader      | 28.34               | 20.30                | +39.6          | 2            |
-| blocked_overtake | 20.30               | 20.30                | +0.0           | 0            |
-| gap_wait         | 19.67               | 18.54                | +6.1           | 1            |
-| light_traffic    | 25.01               | 24.25                | +3.1           | 1            |
-| dense_traffic    | 20.33               | 20.03                | +1.5           | 1            |
-| slow_right_lane  | 26.27               | 18.39                | +42.9          | 3            |
-
-What the numbers say:
-
-- Collisions. Zero, in every scenario, under both policies. This is the only number in
-  the table with a required value, and the others are only meaningful because it holds.
-- The benefit is where the opportunity is. The two scenarios with a clear lane beside a
-  slow obstruction gain 39.6 and 42.9 percent, which is most of the way to the free flow
-  speed of 28.43 m/s. The two scenarios with no usable gap gain nothing: `free_flow` has
-  nothing to overtake and `blocked_overtake` has nowhere to go. A planner that gained
-  speed in `blocked_overtake` would be taking gaps it should not have.
-- Waiting has a price and pays it. In `gap_wait` the ego sits behind a slow leader while
-  faster traffic streams past on its left. It prepares a change four times and the gate
-  refuses each one on `follower_gap`, at 6.5, 15.0, 24.5 and 34.0 seconds, before a
-  usable gap arrives at 41.0 seconds. The 6.1 percent gain is the value of one lane
-  change taken 19 seconds later than the cost function first wanted it.
-- Density removes the opportunity, not the discipline. `dense_traffic`, at sixteen
-  vehicles per lane, yields 1.5 percent from a single lane change, and `light_traffic`,
-  at eight, yields 3.1 percent from one as well. The planner does not manufacture gains
-  by changing lane more often when there is nowhere better to be.
-- Headway. The smallest time headway anywhere in the suite is 1.82 s, above the 1.6 s
-  time gap the traffic itself targets. The fifth percentile of the time to collision
-  never falls below 7.36 s. The median varies widely between scenarios because it is a
-  median over the steps at which the ego was closing on anything at all, and in the
-  scripted scenarios most of those steps are a slow approach from far away.
-
-`outputs/slow_leader_timeline.png` plots the speed, the lateral offset and the behaviour
-state of one run against time, which is where the two prepare states and the two change
-states are visible as a sequence. `outputs/time_to_collision.png` shows the cumulative
-distribution of the times to collision per scenario, and `outputs/suite_speed.png` shows
-the two speed columns above as grouped bars.
-
-## Architecture
-
-| Module | Responsibility |
-| --- | --- |
-| `src/behavior_planner/model/road.py` | `Road`: ring geometry, lane centres, arc length wrapping, signed separation, lane occupancy. |
-| `src/behavior_planner/model/vehicle.py` | `Vehicle`, `VehicleShape`, `LaneChange`: pose, body, and an in-progress lateral manoeuvre. |
-| `src/behavior_planner/model/lateral.py` | `LateralProfile`: the minimum jerk quintic and its closed-form peak rate, acceleration and jerk. |
-| `src/behavior_planner/model/states.py` | `BehaviorState` and `BehaviorEvent`: the two alphabets of the machine. |
-| `src/behavior_planner/model/config.py` | Every tunable number: IDM, MOBIL, cost weights, cost scales, safety limits, planner timings. |
-| `src/behavior_planner/model/traffic.py` | `TrafficSnapshot`: per-lane neighbour queries, overlap detection, headway and time to collision. |
-| `src/behavior_planner/model/decision.py` | `DecisionContext`, `CostTerms`, `SafetyVerdict`, `CandidateScore`, `Decision`. |
-| `src/behavior_planner/algorithm/base.py` | The five Protocols the layers are written against. |
-| `src/behavior_planner/algorithm/idm.py` | The Intelligent Driver Model, including the closed-form equilibrium gap. |
-| `src/behavior_planner/algorithm/mobil.py` | MOBIL: safety criterion, incentive criterion, politeness, keep-right bias. |
-| `src/behavior_planner/algorithm/fsm.py` | The transition table, its totality check, and the successor and event queries. |
-| `src/behavior_planner/algorithm/cost.py` | `WeightedCostModel`: the four normalised terms. |
-| `src/behavior_planner/algorithm/safety.py` | `GapAndDecelerationGate`: the veto, with its own thresholds and no access to any cost. |
-| `src/behavior_planner/algorithm/trajectory.py` | Binding lanes, the acceleration command, and the sampled trajectory for a manoeuvre. |
-| `src/behavior_planner/algorithm/planner.py` | `FiniteStateBehaviorPlanner` and the `KeepLaneBaseline` control. |
-| `src/behavior_planner/pipeline/scenarios.py` | Declarative scenarios, the seeded random fill, and the standard suite. |
-| `src/behavior_planner/pipeline/simulator.py` | The synchronous update loop and the collision check. |
-| `src/behavior_planner/pipeline/trace.py` | `StepRecord` and `RunTrace`, the structured record everything downstream reads. |
-| `src/behavior_planner/pipeline/suite.py` | The one place where the concrete implementations are chosen. |
-| `src/behavior_planner/analysis/metrics.py` | Per-scenario and per-suite metrics. |
-| `src/behavior_planner/analysis/report.py` | Rendering of the two Markdown tables above. |
-| `src/behavior_planner/analysis/figures.py` | The three figures. |
-| `examples/` | Wiring scripts, no logic. |
-
-Each layer depends only on the ones above it. The model layer performs no input or output
-and knows nothing about planners; the algorithm layer draws nothing and writes nothing;
-the pipeline layer chooses the implementations and produces the trace; the analysis layer
-reads the trace and nothing else.
-
-## Testing
+One command regenerates all three figures in place:
 
 ```bash
-uv run pytest
+uv run python examples/plot_results.py --output docs/figures
+```
+
+The files under `docs/figures/` are snapshots, tracked so the README renders without a build
+step. CI does not compare them byte for byte, because matplotlib output is not byte
+reproducible across platforms, font sets or backend versions, and a check that failed on a
+font substitution would say nothing about the planner. What CI does check is that the command
+above still writes exactly those three files, that each is a valid PNG, and that the tracked
+set stays inside its 250 kB budget; the three currently total 141 kB at 110 dots per inch.
+
+Tests, lint and types:
+
+```bash
+uv run pytest -q
 uv run ruff check .
 uv run mypy
 ```
 
-The suite has three tiers: property and invariant tests covering the mathematics,
-regression tests pinning recorded behaviour, and integration tests running each
-example script under a reduced iteration count.
+Coverage, measured with the command CI runs:
 
-333 tests run in about 9 seconds. The first tier exercises all thirty state and event
-pairs of the transition table individually, checks that the car following model converges
-to the closed-form equilibrium gap and to the free flow speed from either side and never
-produces a negative speed, checks the quintic against its closed-form peak derivatives,
-and checks that the ego overtakes a slow leader when the adjacent lane is clear and does
-not when it is blocked. Two tests in `tests/test_safety.py` construct the conflict the
-gate exists for: a situation in which the cost function ranks a lane change ahead of lane
-keeping and the gate refuses it anyway, and a sweep showing that raising the progress
-weight by three orders of magnitude does not buy the manoeuvre.
+```bash
+uv run pytest --cov=src/behavior_planner --cov-report=term-missing
+```
 
-The second tier compares a fresh run of all seven scenarios against
-`tests/data/reference_run.json`. What it pins is chosen from two measurements rather than
-from convenience. Counts, veto classifications and the behaviour state sequence are
-compared exactly, which is safe because the smallest gap between the best two admissible
-candidates anywhere in the suite is of order `1e-3` in cost units, ten orders of magnitude
-above floating point noise; a test asserts that margin so the exact pins stay honest.
-Continuous aggregates are compared at a relative tolerance of `1e-6`, chosen because
-perturbing the ego's free flow speed by a relative `1e-9` moves them by less than `1e-9`
-relative and changes no discrete outcome at all. No instantaneous position or speed late
-in a run is pinned in any form.
+That reports 97 percent of 1735 statements. CI enforces `--cov-fail-under=95`, which is the
+measured figure rounded down and reduced by two, so a small refactor does not fail the build
+and a whole module arriving without tests does. What is left uncovered is validation branches
+in the configuration dataclasses and two defensive paths in the planner that the state
+machine makes unreachable.
 
-The third tier runs each script in `examples/` as a subprocess under a reduced duration,
-writing figures into a temporary directory.
+The suite is 379 tests in about 16 seconds, in three tiers. Property and invariant tests
+cover the mathematics: all thirty
+state and event pairs individually, the car following model against its closed form
+equilibrium gap and free flow speed from either side, the quintic against its closed form
+peak derivatives, and the gate experiment above. Regression tests compare a fresh run of the
+seven scenarios against `tests/data/reference_run.json`, pinning counts, veto
+classifications and the behaviour state sequence exactly and continuous aggregates at a
+relative tolerance of `1e-6`; a test asserts the smallest gap between the best two
+admissible candidates anywhere in the suite, which is what keeps the exact pins honest.
+Integration tests run every script in `examples/` as a subprocess under a reduced workload,
+discovering each script's options from its own help so a new example is covered the moment
+it is added.
+
+## What this does not do
+
+`docs/design-notes.md` records the alternatives considered and rejected, and the conditions
+under which this planner gives poor results. The short version: the cost weights sit in a
+narrow window and a hand tuned linear cost function cannot be widened out of it; the traffic
+prediction is a constant speed extrapolation, so a neighbour that brakes hard during the
+ego's 3.5 second manoeuvre is not anticipated; the road is a straight ring with no lane
+topology; collisions are counted rather than prevented by construction; and there is no
+perception, localisation or tracking controller, so every gap the gate enforces carries no
+allowance for measurement error.
+
+The same document records what was closed and what it cost. The evaluation limitation, seven
+scenarios at one seed each, is the entry that went: the sweep above replaced it, at the price
+of 30 seconds of runtime and a result that is less flattering than the one it replaced.
 
 ## References
 
@@ -320,7 +332,7 @@ Models:
   Springer, 2013.
   DOI [10.1007/978-3-642-32460-4](https://doi.org/10.1007/978-3-642-32460-4). The
   reference treatment of both models, including the equilibrium relations used in the
-  tests.
+  tests and the stop and go regime the densest sweep runs sit in.
 - J. Wei, J. M. Snider, T. Gu, J. M. Dolan and B. Litkouhi, "A behavioral planning
   framework for autonomous driving", IEEE Intelligent Vehicles Symposium, 2014, pages 458
   to 464. DOI [10.1109/IVS.2014.6856582](https://doi.org/10.1109/IVS.2014.6856582). The
@@ -343,9 +355,9 @@ Dependencies:
   reduction order of a linear algebra kernel from the set of things a run can depend on.
 - [matplotlib](https://matplotlib.org/) (matplotlib license, a BSD-style permissive
   license). The three figures.
-- [pytest](https://docs.pytest.org/) (MIT), [ruff](https://docs.astral.sh/ruff/) (MIT),
-  and [mypy](https://mypy-lang.org/) (MIT). Development only: test running, linting, and
-  type checking.
+- [pytest](https://docs.pytest.org/) (MIT), [pytest-cov](https://pytest-cov.readthedocs.io/)
+  (MIT), [ruff](https://docs.astral.sh/ruff/) (MIT), and [mypy](https://mypy-lang.org/)
+  (MIT). Development only: test running, coverage, linting, and type checking.
 
 ## License
 

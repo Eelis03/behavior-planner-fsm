@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from behavior_planner.model.decision import VetoReason
 from behavior_planner.model.states import BehaviorEvent, BehaviorState
+from behavior_planner.model.vehicle import EGO_ID
 
 __all__ = ["RunTrace", "StepRecord"]
 
@@ -110,6 +111,23 @@ class RunTrace:
     def collision_count(self) -> int:
         """Distinct pairs of vehicles that overlapped at any point in the run."""
         return len(self.collision_pairs)
+
+    @property
+    def ego_collision_pairs(self) -> tuple[tuple[int, int], ...]:
+        """Overlapping pairs the ego was part of.
+
+        Two traffic vehicles colliding with each other and the ego colliding
+        with something are different failures with different owners: the first
+        is a property of the traffic model, the second is a property of the
+        behaviour layer. Reporting one number for both would let either hide
+        behind the other.
+        """
+        return tuple(pair for pair in self.collision_pairs if EGO_ID in pair)
+
+    @property
+    def ego_collision_count(self) -> int:
+        """Distinct vehicles the ego overlapped at any point in the run."""
+        return len(self.ego_collision_pairs)
 
     @property
     def veto_reasons(self) -> tuple[VetoReason, ...]:

@@ -194,6 +194,45 @@ makes the scenario fully specified by its initial condition. The cost is that a 
 run at 28 m/s laps a 1200 metre ring more than once, so the ego meets the same traffic
 again; this is stated here because it affects how the lane change counts should be read.
 
+## Closed limitations
+
+### The scenario suite was small and every case ran once at one seed
+
+*What it said.* Seven scenarios, each run once at one seed, is enough to demonstrate the
+behaviours and not enough to characterise the planner. A proper evaluation would sweep
+density and seed and report distributions rather than single runs. The metrics module and
+the trace record are built to support that; the suite is not.
+
+*What closed it.* `pipeline/scenarios.sweep_scenarios` builds the grid, `pipeline/suite.run_sweep`
+runs it grouped by density, `analysis/metrics.sweep_metrics` reduces each density to a
+distribution, and `examples/run_sweep.py` reports it. Five densities from 4 to 20 vehicles
+per lane, eight seeds at each, both policies, 80 runs. Only the density and the seed vary
+across the grid, which `tests/test_sweep.py::test_only_the_density_and_the_seed_vary_across_the_grid`
+checks rather than assumes. Twenty tests cover the grid construction, the reduction, the
+pairing of planner and control runs by seed, and the reproducibility of the whole sweep.
+
+*What it cost.* About 30 seconds of wall clock for the full grid, against 2.6 seconds for
+the seven scenarios, which is why the sweep is an example script rather than part of the
+default test run; the tests exercise a two by three grid at a reduced duration instead. One
+new metric, `ScenarioMetrics.minimum_speed`, and one new distinction, between a collision
+involving the ego and a collision anywhere in the traffic, were needed to report the result
+honestly. The sweep also cost the repository a flattering number: the +1.5 and +3.1 percent
+gains the single `dense_traffic` and `light_traffic` runs reported are not typical. Across
+40 random fills the median paired gain is zero at every density and the mean is negative at
+three of the five, reaching -8.9 percent at 20 vehicles per lane. That is the memoryless
+progress term doing exactly what the first entry under Known limitations says it must, now
+measured rather than predicted.
+
+*What remains.* Two things. The three scripted scenarios are still hand-built and their
+obstructions still hold their lanes: `holds_lane` raises a vehicle's MOBIL switching
+threshold beyond reach so that a scenario designed to obstruct the ego is not dissolved by
+MOBIL's courtesy, and it is declared on the scenario rather than hidden in the model. The
+sweep does not use it, so the two families are now separate: scripted cases that make one
+behaviour unambiguous, and randomised fills that measure. The second is that the sweep
+varies density and seed only. Politeness, the speed gradient between lanes, the lane change
+duration and the planning period are all held at their defaults, and a sweep over those
+would be a different and larger experiment.
+
 ## Known limitations
 
 ### The cost weights sit in a narrow window, and this is a property of the method
@@ -228,7 +267,12 @@ The specific things it cannot do:
 - It cannot distinguish a lane change worth 2 m/s for the next ten seconds from one worth
   2 m/s for the next two, because the progress term measures an instantaneous speed
   shortfall rather than an integral. A receding horizon formulation would, at the cost of
-  having to predict the traffic.
+  having to predict the traffic. The density sweep measures the consequence: over 40 random
+  fills the mean paired gain against the lane keeping control is negative at three of the
+  five densities, and the worst single run, `density_20_seed_102`, averages 11.07 m/s and
+  finishes 47.8 percent behind the lane keeping control on the same seed after taking two
+  lane changes into traffic slower than the traffic it left. The weights are not mistuned
+  for that run. There is no weight vector that gets it right without a horizon.
 - It cannot be tuned per situation without becoming a rule table with extra steps. Every
   situation the current weights rank wrongly is an argument for another term, and every
   term widens the space in which the previous tuning has to be rechecked.
@@ -263,24 +307,23 @@ colleagues, and the change would reach into `Road.occupied_lanes`,
 `BehaviorState.lane_offset` and the feasibility filter in the planner. Curvature would
 additionally invalidate the axis-aligned collision box.
 
-### The scenario suite is small and its scripted cases are hand-built
-
-Seven scenarios, each run once at one seed, is enough to demonstrate the behaviours and not
-enough to characterise the planner. The scenarios with hand-placed obstructions are built
-to make one behaviour unambiguous each, and those obstructions hold their lanes, which is
-a simplification declared on the scenario rather than hidden in the model. A proper
-evaluation would sweep density and seed and report distributions rather than single runs.
-The metrics module and the trace record are built to support that; the suite is not.
-
 ### Collisions are counted, not prevented by construction
 
 Zero collisions across the suite is a measured result, not a guarantee. The Intelligent
 Driver Model is collision free only against a leader that does not brake harder than the
 follower's comfortable deceleration, and the safety gate reduces but does not eliminate the
 risk of a cut-in during the ego's manoeuvre. The claim this repository makes is the one the
-metric supports: under these seven scenarios, with these parameters, no two vehicles
-overlapped at any step. A guarantee would require a reachability argument over the whole
-state space, which is a different piece of work.
+metric supports: under these seven scenarios and the 80 runs of the density sweep, with
+these parameters, the ego never overlapped another vehicle. A guarantee would require a
+reachability argument over the whole state space, which is a different piece of work.
+
+The sweep found the boundary of that claim, which is why the trace now separates an overlap
+involving the ego from an overlap anywhere in the traffic. One of the 80 runs,
+`density_20_seed_103` under the lane keeping control, contains an overlap between two
+traffic vehicles. Neither is the ego and the behaviour layer is not implicated, but the
+traffic model, MOBIL deciding at 1 Hz over a 3.5 second lateral transition, is not
+collision free at 20 vehicles per lane. Reporting one number for both would have let the
+planner's zero and the traffic model's one hide behind each other.
 
 ### The behaviour layer is the only thing being tested
 

@@ -35,7 +35,8 @@ def main() -> None:
     if arguments.duration is not None:
         scenarios = tuple(item.with_duration(arguments.duration) for item in scenarios)
 
-    planned = suite_metrics(run_suite(scenarios))
+    traces = run_suite(scenarios)
+    planned = suite_metrics(traces)
     baseline = suite_metrics(run_suite(scenarios, baseline=True))
 
     print("Scenario suite under the finite state machine planner")
@@ -52,9 +53,7 @@ def main() -> None:
     print(f"Smallest time headway: {planned.minimum_time_headway:.2f} s")
     print(f"Smallest time to collision: {planned.minimum_time_to_collision:.2f} s")
 
-    reasons = sorted(
-        {reason.value for trace in run_suite(scenarios) for reason in trace.veto_reasons}
-    )
+    reasons = sorted({reason.value for trace in traces for reason in trace.veto_reasons})
     print(f"Safety gate veto reasons raised: {', '.join(reasons) if reasons else 'none'}")
 
 

@@ -59,6 +59,7 @@ def main() -> None:
     print()
     print(f"collisions          {metrics.collisions}")
     print(f"mean speed          {metrics.mean_speed:.2f} m/s")
+    print(f"minimum speed       {metrics.minimum_speed:.2f} m/s")
     print(f"distance            {metrics.distance:.0f} m")
     print(f"lane changes        {metrics.lane_changes}")
     print(f"minimum headway     {metrics.minimum_time_headway:.2f} s")

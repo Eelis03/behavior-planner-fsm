@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from behavior_planner.analysis.metrics import scenario_metrics, suite_metrics
+from behavior_planner.analysis.metrics import SuiteMetrics, scenario_metrics, suite_metrics
 from behavior_planner.analysis.report import comparison_table, scenario_table
 from behavior_planner.model.traffic import time_headway, time_to_collision
 from behavior_planner.pipeline.scenarios import standard_suite
@@ -114,3 +114,20 @@ def test_an_empty_suite_is_rejected() -> None:
     """Aggregating nothing is an error, not an empty table."""
     with pytest.raises(ValueError, match="at least one"):
         suite_metrics(())
+    with pytest.raises(ValueError, match="at least one scenario"):
+        SuiteMetrics(policy="fsm", scenarios=())
+
+
+def test_the_headline_totals_sum_their_columns(planned: tuple[object, ...]) -> None:
+    """The two numbers the README quotes as headlines are sums, not samples."""
+    metrics = suite_metrics(planned)  # type: ignore[arg-type]
+    assert metrics.total_collisions == sum(item.collisions for item in metrics.scenarios)
+    assert metrics.total_lane_changes == sum(item.lane_changes for item in metrics.scenarios)
+    assert metrics.total_collisions == 0
+
+
+def test_the_minimum_speed_never_exceeds_the_mean(planned: tuple[object, ...]) -> None:
+    """A mean over a run cannot be below every value it averages."""
+    for trace in planned:
+        metrics = scenario_metrics(trace)  # type: ignore[arg-type]
+        assert 0.0 <= metrics.minimum_speed <= metrics.mean_speed
