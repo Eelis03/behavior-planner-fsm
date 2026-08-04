@@ -81,7 +81,8 @@ The gate therefore:
 - reads its thresholds from `SafetyLimits`, which is a different dataclass from
   `CostConfig`, so the cost function's notion of a roomy gap and the gate's notion of a
   permitted gap cannot drift into being the same number by accident;
-- returns a `SafetyVerdict`, which carries a boolean and a named reason, not a penalty;
+- returns a `SafetyVerdict`, which carries a boolean and a named reason, not a penalty,
+  together with the margin by which the binding threshold was met or missed;
 - is applied in `FiniteStateBehaviorPlanner._score_all` before any cost comparison, so a
   vetoed candidate is not in the set the minimum is taken over.
 
@@ -98,6 +99,15 @@ difference is measurable. Setting the safety weight to zero and running the suit
 which veto reasons appear: with the term the gate raises `follower_gap` and its relatives,
 and without it the gate also has to raise `occupied` and `leader_gap`. The cost term makes
 the planner polite; the gate makes it safe. Only one of the two is load bearing.
+
+The margin on the verdict is reported rather than discarded, because the veto reasons alone
+describe only the manoeuvres that were stopped. `Decision.gate_margin` carries the margin of
+the state each cycle adopts, the trace records it, and `ScenarioMetrics.minimum_gate_margin`
+reduces a run to the least room the gate left. It is signed for a reason: a lane change past
+`PlannerConfig.abort_progress_limit` is finished rather than reversed, so a negative minimum
+names a run in which the gate was overruled by the abort policy. Four of the sweep's 40
+planner runs contain one and none of the seven scripted scenarios does, which is a
+difference between the two families that no other metric here shows.
 
 ### Why the lateral profile is a single quintic
 
@@ -292,7 +302,9 @@ is therefore not anticipated. The abort path covers this partially: the gate is
 re-evaluated every planning cycle while the manoeuvre runs, and a change less than 40
 percent complete is given up when the gate objects. Beyond that point the ego finishes, on
 the grounds that reversing across a boundary it has already crossed is worse than
-completing. A planner facing genuinely adversarial traffic would need a prediction model
+completing. How often that happens is now measured rather than assumed: the minimum gate
+margin is negative in four of the sweep's 40 planner runs and in none of the seven scripted
+scenarios. A planner facing genuinely adversarial traffic would need a prediction model
 rather than a constant speed extrapolation, and the interface for that would sit beside
 `CarFollowingModel` in `algorithm/base.py`.
 

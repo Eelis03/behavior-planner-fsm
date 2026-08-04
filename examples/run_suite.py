@@ -52,6 +52,7 @@ def main() -> None:
     print(f"Mean ego speed: {planned.mean_speed:.2f} m/s")
     print(f"Smallest time headway: {planned.minimum_time_headway:.2f} s")
     print(f"Smallest time to collision: {planned.minimum_time_to_collision:.2f} s")
+    print(f"Tightest safety gate margin: {planned.minimum_gate_margin:.3f} of the threshold")
 
     reasons = sorted({reason.value for trace in traces for reason in trace.veto_reasons})
     print(f"Safety gate veto reasons raised: {', '.join(reasons) if reasons else 'none'}")

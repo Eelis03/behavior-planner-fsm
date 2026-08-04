@@ -123,6 +123,15 @@ Over the seven: 0 collisions, 8 lane changes, a mean ego speed of 24.05 m/s, a s
 headway of 1.82 s and a smallest time to collision of 6.88 s. The gate raised three distinct
 veto reasons, `follower_gap`, `follower_time_to_collision` and `follower_deceleration`.
 
+A veto reason says which manoeuvres the gate stopped and nothing about how close the ones it
+allowed came to being stopped, so the verdict carries a margin as well: the distance from
+whichever threshold bound the manoeuvre, as a fraction of that threshold. The tightest one
+over the seven is 0.327, on the change `gap_wait` eventually takes. Thirty seven planning
+cycles across the suite carry a bounded margin; the rest either adopted no manoeuvre or
+adopted one into a lane empty enough that no threshold bound it. The reasons and the margin
+are the same measurement seen from either side, and a gate that refused nothing because
+nothing came close is not the same object as one that permitted everything by a hair.
+
 The benefit is where the opportunity is. The two scenarios with a clear lane beside a slow
 obstruction gain 39.6 and 42.9 percent, most of the way to the free flow speed of 28.43 m/s.
 The two with no usable gap gain nothing: `free_flow` has nothing to overtake and
@@ -192,6 +201,18 @@ following model rather than the gate permitting anything: the gate governs lane 
 has no authority over how closely the ego follows in its own lane. The number is still
 evidence that the seven hand built scenarios sample an easier part of the space than random
 traffic does.
+
+The gate's own margin moves the same way and further. The tightest one anywhere in the 40
+planner runs is -0.436, against +0.327 over the seven scenarios, and a negative margin means
+what the abort path says it means: a lane change already past 40 percent of its lateral
+transition was finished rather than reversed after the gate came to object to it. Four runs
+contain such a cycle, `density_16_seed_108`, `density_20_seed_102`, `density_20_seed_103`
+and `density_20_seed_105`, all of them at the two highest densities. None of them ends in a
+collision, which is the point: the abort limit is a policy about which of two bad options to
+take, and until this number existed the repository could not say how often it was being
+exercised. The scripted suite exercises it never, and
+`tests/test_gate_margin.py::test_the_suite_takes_no_manoeuvre_the_gate_had_come_to_refuse`
+is the assertion of that, scoped to the suite because the sweep does not support it.
 
 ## Installation
 
@@ -276,17 +297,17 @@ Coverage, measured with the command CI runs:
 uv run pytest --cov=src/behavior_planner --cov-report=term-missing
 ```
 
-That reports 97 percent of 1735 statements. CI enforces `--cov-fail-under=95`, which is the
+That reports 97 percent of 1761 statements. CI enforces `--cov-fail-under=95`, which is the
 measured figure rounded down and reduced by two, so a small refactor does not fail the build
 and a whole module arriving without tests does. What is left uncovered is validation branches
 in the configuration dataclasses and two defensive paths in the planner that the state
 machine makes unreachable.
 
-The suite is 379 tests in about 16 seconds, in three tiers. Property and invariant tests
-cover the mathematics: all thirty
-state and event pairs individually, the car following model against its closed form
-equilibrium gap and free flow speed from either side, the quintic against its closed form
-peak derivatives, and the gate experiment above. Regression tests compare a fresh run of the
+The suite is 390 tests in about 16 seconds, in three tiers. Property and invariant tests
+cover the mathematics: all thirty state and event pairs individually, the car following
+model against its closed form equilibrium gap and free flow speed from either side, the
+quintic against its closed form peak derivatives, the margin the gate reports beside each
+verdict, and the gate experiment above. Regression tests compare a fresh run of the
 seven scenarios against `tests/data/reference_run.json`, pinning counts, veto
 classifications and the behaviour state sequence exactly and continuous aggregates at a
 relative tolerance of `1e-6`; a test asserts the smallest gap between the best two

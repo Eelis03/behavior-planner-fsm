@@ -73,6 +73,7 @@ def main() -> None:
     print(f"Collisions anywhere:         {planned.total_collisions}")
     print(f"Smallest time headway:       {planned.minimum_time_headway:.2f} s")
     print(f"Smallest time to collision:  {planned.minimum_time_to_collision:.2f} s")
+    print(f"Tightest gate margin:        {planned.minimum_gate_margin:.3f} of the threshold")
     print(f"Lowest ego speed:            {planned.minimum_speed:.2f} m/s")
     print(
         f"Slowest run:                 {slowest.scenario} at {slowest.mean_speed:.2f} m/s, "
