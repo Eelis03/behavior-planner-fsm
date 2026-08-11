@@ -56,9 +56,7 @@ def main() -> None:
         run_sweep(densities=densities, seeds=seeds, duration=arguments.duration)
     )
     baseline = sweep_metrics(
-        run_sweep(
-            densities=densities, seeds=seeds, duration=arguments.duration, baseline=True
-        )
+        run_sweep(densities=densities, seeds=seeds, duration=arguments.duration, baseline=True)
     )
     elapsed = time.perf_counter() - started
 

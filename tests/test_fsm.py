@@ -108,8 +108,7 @@ def test_a_prepare_state_cannot_switch_direction_without_passing_through_keep_la
     returned = transition(left, BehaviorEvent.ABORT)
     assert returned is BehaviorState.KEEP_LANE
     assert (
-        transition(returned, BehaviorEvent.REQUEST_RIGHT)
-        is BehaviorState.PREPARE_LANE_CHANGE_RIGHT
+        transition(returned, BehaviorEvent.REQUEST_RIGHT) is BehaviorState.PREPARE_LANE_CHANGE_RIGHT
     )
 
 
@@ -153,8 +152,6 @@ def test_event_for_rejects_an_unreachable_successor() -> None:
         (BehaviorState.LANE_CHANGE_RIGHT, -1),
     ],
 )
-def test_lane_offset_matches_the_direction_of_the_state(
-    state: BehaviorState, offset: int
-) -> None:
+def test_lane_offset_matches_the_direction_of_the_state(state: BehaviorState, offset: int) -> None:
     """Left raises the lane index, right lowers it, keep lane leaves it alone."""
     assert state.lane_offset == offset

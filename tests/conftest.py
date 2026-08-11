@@ -39,9 +39,7 @@ def lane_change_model(car_following: IntelligentDriverModel) -> MobilLaneChangeM
 
 
 @pytest.fixture
-def gate(
-    config: PlannerConfig, car_following: IntelligentDriverModel
-) -> GapAndDecelerationGate:
+def gate(config: PlannerConfig, car_following: IntelligentDriverModel) -> GapAndDecelerationGate:
     """The default safety gate."""
     return GapAndDecelerationGate(limits=config.safety, car_following=car_following)
 
@@ -53,9 +51,7 @@ def cost(config: PlannerConfig) -> WeightedCostModel:
 
 
 @pytest.fixture
-def planner(
-    cost: WeightedCostModel, gate: GapAndDecelerationGate
-) -> FiniteStateBehaviorPlanner:
+def planner(cost: WeightedCostModel, gate: GapAndDecelerationGate) -> FiniteStateBehaviorPlanner:
     """The default behaviour policy."""
     return FiniteStateBehaviorPlanner(cost=cost, gate=gate)
 
@@ -85,9 +81,7 @@ def make_vehicle(
     )
 
 
-def make_ego(
-    road: Road, *, lane: int, s: float, speed: float, desired_speed: float
-) -> Vehicle:
+def make_ego(road: Road, *, lane: int, s: float, speed: float, desired_speed: float) -> Vehicle:
     """The ego vehicle centred in ``lane`` at ``s``."""
     return make_vehicle(
         road,

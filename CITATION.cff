@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Behavior Planner FSM"
+abstract: >-
+  Lane change decisions from a finite state machine and a cost function on a
+  highway traffic simulation whose surrounding vehicles run the Intelligent
+  Driver Model and MOBIL, built to show that a safety gate applied before any
+  cost is compared behaves in a way no safety weight inside the sum can
+  reproduce.
+type: software
+authors:
+  - family-names: Yilmaz
+    given-names: Emre
+repository-code: "https://github.com/Eelis03/behavior-planner-fsm"
+license: MIT
+version: "0.1.0"
+date-released: "2026-08-11"
+keywords:
+  - autonomous-driving
+  - behavior-planning
+  - decision-making
+  - python

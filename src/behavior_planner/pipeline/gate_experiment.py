@@ -155,9 +155,7 @@ def gate_weight_sweep(
             )
         )
         cost = WeightedCostModel(config.cost)
-        gate = GapAndDecelerationGate(
-            limits=config.safety, car_following=IntelligentDriverModel()
-        )
+        gate = GapAndDecelerationGate(limits=config.safety, car_following=IntelligentDriverModel())
         planner = FiniteStateBehaviorPlanner(cost=cost, gate=gate)
         context = blocked_merge_context(config)
 

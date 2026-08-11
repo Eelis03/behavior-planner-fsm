@@ -99,9 +99,7 @@ def test_the_right_bias_makes_a_change_to_the_right_cheaper(
     """The asymmetric variant lowers the threshold one way and raises it the other."""
     biased = MobilParams(right_bias=0.5)
     subject = make_vehicle(road, vehicle_id=1, lane=1, s=0.0, speed=28.0, desired_speed=30.0)
-    subject = replace(
-        subject, driver=DriverParams(idm=subject.driver.idm, mobil=biased)
-    )
+    subject = replace(subject, driver=DriverParams(idm=subject.driver.idm, mobil=biased))
     scene = snapshot(road, subject)
     to_right = lane_change_model.assess(subject, scene, 0)
     to_left = lane_change_model.assess(subject, scene, 2)

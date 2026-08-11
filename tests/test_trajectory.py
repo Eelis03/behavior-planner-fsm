@@ -37,9 +37,7 @@ def context(
 
 
 @pytest.fixture
-def generator(
-    car_following: IntelligentDriverModel, config: PlannerConfig
-) -> TrajectoryGenerator:
+def generator(car_following: IntelligentDriverModel, config: PlannerConfig) -> TrajectoryGenerator:
     """The default trajectory generator."""
     return TrajectoryGenerator(car_following=car_following, config=config)
 
@@ -57,9 +55,7 @@ def test_preparing_and_changing_bind_both_lanes(road: Road) -> None:
     assert binding_lanes(road, ego, BehaviorState.LANE_CHANGE_RIGHT) == (0, 1)
 
 
-def test_the_strictest_binding_lane_wins(
-    road: Road, car_following: IntelligentDriverModel
-) -> None:
+def test_the_strictest_binding_lane_wins(road: Road, car_following: IntelligentDriverModel) -> None:
     """Preparing behind a slow vehicle in the target lane holds the ego back.
 
     This is how a prepare state does its job: the ego drops back until a gap
@@ -139,22 +135,16 @@ def test_a_lane_change_trajectory_follows_the_lateral_profile(
     assert points[-1].d == pytest.approx(road.lane_center(1))
 
 
-def test_no_manoeuvre_is_built_for_a_lane_off_the_road(
-    road: Road, config: PlannerConfig
-) -> None:
+def test_no_manoeuvre_is_built_for_a_lane_off_the_road(road: Road, config: PlannerConfig) -> None:
     """A change out of the rightmost lane produces nothing rather than an invalid profile."""
     ego = make_ego(road, lane=0, s=0.0, speed=28.0, desired_speed=31.0)
     assert (
-        lane_change_for(
-            road, ego, BehaviorState.LANE_CHANGE_RIGHT, config.lane_change_duration
-        )
+        lane_change_for(road, ego, BehaviorState.LANE_CHANGE_RIGHT, config.lane_change_duration)
         is None
     )
 
 
-def test_the_lateral_manoeuvre_respects_comfort_limits(
-    road: Road, config: PlannerConfig
-) -> None:
+def test_the_lateral_manoeuvre_respects_comfort_limits(road: Road, config: PlannerConfig) -> None:
     """The default duration keeps the lateral acceleration inside a comfortable band.
 
     Published comfort thresholds for lateral acceleration in normal driving sit
@@ -171,9 +161,7 @@ def test_the_lateral_manoeuvre_respects_comfort_limits(
 
 def test_a_ballistic_step_wraps_around_the_ring(road: Road) -> None:
     """Arc length stays inside the road, whatever the step size."""
-    speed, s = ballistic_step(
-        speed=30.0, s=road.length - 1.0, acceleration=0.0, dt=1.0, road=road
-    )
+    speed, s = ballistic_step(speed=30.0, s=road.length - 1.0, acceleration=0.0, dt=1.0, road=road)
     assert speed == pytest.approx(30.0)
     assert 0.0 <= s < road.length
     assert s == pytest.approx(29.0)

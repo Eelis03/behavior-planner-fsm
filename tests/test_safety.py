@@ -235,9 +235,7 @@ def test_raising_the_progress_weight_cannot_buy_the_manoeuvre(
     for progress in (5.0, 50.0, 500.0, 5000.0):
         config = PlannerConfig(
             cost=CostConfig(
-                weights=CostWeights(
-                    progress=progress, safety=0.0, comfort=0.0, lane_preference=0.0
-                )
+                weights=CostWeights(progress=progress, safety=0.0, comfort=0.0, lane_preference=0.0)
             )
         )
         planner = FiniteStateBehaviorPlanner(cost=WeightedCostModel(config.cost), gate=gate)

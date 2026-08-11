@@ -91,9 +91,7 @@ def test_following_a_steady_leader_reaches_the_equilibrium_spacing(
         acceleration = car_following.acceleration(
             speed=speed, gap=gap, leader_speed=leader_speed, driver=driver
         )
-        speed, s = ballistic_step(
-            speed=speed, s=s, acceleration=acceleration, dt=0.05, road=road
-        )
+        speed, s = ballistic_step(speed=speed, s=s, acceleration=acceleration, dt=0.05, road=road)
         leader_s = road.wrap(leader_s + leader_speed * 0.05)
         if s > leader_s:
             leader_s += road.length
@@ -115,9 +113,7 @@ def test_the_model_never_produces_a_negative_speed(
         acceleration = car_following.acceleration(
             speed=speed, gap=leader_s - s, leader_speed=0.0, driver=driver
         )
-        speed, s = ballistic_step(
-            speed=speed, s=s, acceleration=acceleration, dt=0.1, road=road
-        )
+        speed, s = ballistic_step(speed=speed, s=s, acceleration=acceleration, dt=0.1, road=road)
         assert speed >= 0.0
     assert speed == pytest.approx(0.0, abs=1e-9)
 
@@ -142,15 +138,9 @@ def test_closing_on_a_leader_is_penalised_more_than_matching_it(
     car_following: IntelligentDriverModel, driver: DriverParams
 ) -> None:
     """The closing rate term brakes earlier than the distance term alone would."""
-    matched = car_following.acceleration(
-        speed=25.0, gap=40.0, leader_speed=25.0, driver=driver
-    )
-    closing = car_following.acceleration(
-        speed=25.0, gap=40.0, leader_speed=15.0, driver=driver
-    )
-    opening = car_following.acceleration(
-        speed=25.0, gap=40.0, leader_speed=32.0, driver=driver
-    )
+    matched = car_following.acceleration(speed=25.0, gap=40.0, leader_speed=25.0, driver=driver)
+    closing = car_following.acceleration(speed=25.0, gap=40.0, leader_speed=15.0, driver=driver)
+    opening = car_following.acceleration(speed=25.0, gap=40.0, leader_speed=32.0, driver=driver)
     assert closing < matched < opening
 
 
@@ -160,9 +150,7 @@ def test_desired_gap_is_never_below_the_jam_distance(
     """The dynamic term is clamped at zero, so ``s_star`` never falls under ``s0``."""
     params = driver.idm
     for leader_speed in (0.0, 25.0, 60.0):
-        desired = car_following.desired_gap(
-            speed=25.0, leader_speed=leader_speed, params=params
-        )
+        desired = car_following.desired_gap(speed=25.0, leader_speed=leader_speed, params=params)
         assert desired >= params.minimum_gap
 
 

@@ -63,8 +63,7 @@ class IdmParams:
             )
         if self.comfortable_deceleration <= 0.0:
             raise ValueError(
-                "comfortable_deceleration must be positive, "
-                f"got {self.comfortable_deceleration}"
+                f"comfortable_deceleration must be positive, got {self.comfortable_deceleration}"
             )
         if self.acceleration_exponent <= 0.0:
             raise ValueError(

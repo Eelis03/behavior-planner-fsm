@@ -5,7 +5,7 @@ traffic simulation in which the surrounding vehicles follow the Intelligent Driv
 and choose their own lanes with MOBIL.
 
 [![CI](https://github.com/Eelis03/behavior-planner-fsm/actions/workflows/ci.yml/badge.svg)](https://github.com/Eelis03/behavior-planner-fsm/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ![Cost preference for a lane change rises by a factor of 1140 as the progress weight goes from 5 to 5000, while the safety gate refuses the manoeuvre at every one of the ten weights and the planner never takes it](docs/figures/gate_weight_sweep.png)
@@ -216,7 +216,9 @@ is the assertion of that, scoped to the suite because the sweep does not support
 
 ## Installation
 
-Requires Python 3.12 or later.
+Requires Python 3.12 or later. Continuous integration runs the whole suite on 3.12 and
+3.13, on Linux and on Windows, so the version floor in `pyproject.toml` is a tested claim
+rather than a declared one.
 
 ```bash
 git clone https://github.com/Eelis03/behavior-planner-fsm.git
@@ -288,6 +290,7 @@ Tests, lint and types:
 ```bash
 uv run pytest -q
 uv run ruff check .
+uv run ruff format --check .
 uv run mypy
 ```
 
