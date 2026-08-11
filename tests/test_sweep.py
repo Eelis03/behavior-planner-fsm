@@ -152,9 +152,7 @@ def test_the_sweep_aggregate_reports_the_worst_case(planned: tuple[DensityGroup,
         item.minimum_gate_margin for item in metrics.densities
     )
     for density in metrics.densities:
-        assert density.minimum_gate_margin == min(
-            item.minimum_gate_margin for item in density.runs
-        )
+        assert density.minimum_gate_margin == min(item.minimum_gate_margin for item in density.runs)
 
 
 def test_the_ego_collision_count_is_a_subset_of_all_collisions(

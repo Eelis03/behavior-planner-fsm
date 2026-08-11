@@ -45,9 +45,7 @@ def context(
     )
 
 
-def committing_scene(
-    road: Road, config: PlannerConfig
-) -> tuple[DecisionContext, BehaviorState]:
+def committing_scene(road: Road, config: PlannerConfig) -> tuple[DecisionContext, BehaviorState]:
     """A prepared change the gate permits, with a neighbour close enough to bind.
 
     An empty target lane leaves the verdict unbounded, which is correct and is
@@ -239,9 +237,7 @@ def test_the_margin_tightens_when_the_gate_is_relaxed() -> None:
     strict = run_scenario(scenario)
     relaxed = run_scenario(
         scenario,
-        config=PlannerConfig(
-            safety=SafetyLimits(minimum_leader_gap=2.5, minimum_follower_gap=2.5)
-        ),
+        config=PlannerConfig(safety=SafetyLimits(minimum_leader_gap=2.5, minimum_follower_gap=2.5)),
     )
     assert math.isfinite(strict.minimum_gate_margin)
     assert relaxed.minimum_gate_margin > strict.minimum_gate_margin
