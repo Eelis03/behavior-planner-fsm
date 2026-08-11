@@ -42,6 +42,13 @@ class StepRecord:
     veto_reason: VetoReason
     """Why the gate refused a candidate this step, ``NONE`` when it refused none."""
 
+    gate_margin: float
+    """Room the gate left on the manoeuvre adopted, ``inf`` when it bounded none.
+
+    The gate rules once per planning cycle rather than once per integration step,
+    so this is unbounded on every step where the behaviour layer did not run.
+    """
+
     planned: bool
     """True on the steps where the behaviour layer ran."""
 
@@ -139,6 +146,20 @@ class RunTrace:
         return tuple(seen)
 
     @property
+    def minimum_gate_margin(self) -> float:
+        """Least room the gate left on a manoeuvre the ego adopted, ``inf`` if none.
+
+        The time headway and the time to collision recorded here describe the car
+        following model, which governs how closely the ego follows in its own
+        lane and over which the gate has no authority. This is the one quantity
+        on the record that describes the gate, and it distinguishes a run in
+        which no manoeuvre came close to refusal from one in which every
+        manoeuvre was taken by a hair.
+        """
+        margins = self.gate_margins()
+        return min(margins) if margins else math.inf
+
+    @property
     def distance_travelled(self) -> float:
         """Arc length covered by the ego over the run, in metres."""
         return sum(record.speed for record in self.records[1:]) * self.dt
@@ -157,4 +178,10 @@ class RunTrace:
             record.time_to_collision
             for record in self.records
             if math.isfinite(record.time_to_collision)
+        )
+
+    def gate_margins(self) -> tuple[float, ...]:
+        """Every bounded gate margin observed, in step order."""
+        return tuple(
+            record.gate_margin for record in self.records if math.isfinite(record.gate_margin)
         )

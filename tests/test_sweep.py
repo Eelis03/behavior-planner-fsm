@@ -140,7 +140,7 @@ def test_density_costs_speed(planned: tuple[DensityGroup, ...]) -> None:
 
 
 def test_the_sweep_aggregate_reports_the_worst_case(planned: tuple[DensityGroup, ...]) -> None:
-    """The headway and time to collision of a sweep are minima over every run."""
+    """The headway, time to collision and gate margin of a sweep are minima."""
     metrics = sweep_metrics(planned)
     assert metrics.minimum_time_headway == min(
         item.minimum_time_headway for item in metrics.densities
@@ -148,6 +148,11 @@ def test_the_sweep_aggregate_reports_the_worst_case(planned: tuple[DensityGroup,
     assert metrics.minimum_time_to_collision == min(
         item.minimum_time_to_collision for item in metrics.densities
     )
+    assert metrics.minimum_gate_margin == min(
+        item.minimum_gate_margin for item in metrics.densities
+    )
+    for density in metrics.densities:
+        assert density.minimum_gate_margin == min(item.minimum_gate_margin for item in density.runs)
 
 
 def test_the_ego_collision_count_is_a_subset_of_all_collisions(

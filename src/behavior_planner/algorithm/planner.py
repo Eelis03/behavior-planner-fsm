@@ -15,6 +15,8 @@ One planning cycle proceeds in this order.
 
 Every candidate, admissible or not, is kept in the returned decision with its
 terms and its verdict, which is what makes the trace readable after the fact.
+The decision also carries the margin of the state it adopts, so a run can report
+how much room the gate left and not only where it refused.
 """
 
 from __future__ import annotations
@@ -68,6 +70,7 @@ class FiniteStateBehaviorPlanner:
             event=best.event,
             target_lane=best.target_lane,
             candidates=candidates,
+            gate_margin=best.verdict.margin,
         )
 
     def _resolve_running_change(self, context: DecisionContext, maneuver: LaneChange) -> Decision:
@@ -107,6 +110,7 @@ class FiniteStateBehaviorPlanner:
             event=BehaviorEvent.STAY,
             target_lane=maneuver.target_lane,
             candidates=(),
+            gate_margin=verdict.margin,
         )
 
     def _score_all(self, context: DecisionContext) -> tuple[CandidateScore, ...]:

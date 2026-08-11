@@ -71,6 +71,22 @@ class ScenarioMetrics:
     ttc_samples: int
     """Number of steps at which the ego was closing on a leader."""
 
+    minimum_gate_margin: float
+    """Least room the safety gate left on a manoeuvre the ego adopted.
+
+    The headway and time to collision above measure the car following model.
+    This is the only number here that measures the gate, and it is what
+    separates a run in which the gate refused nothing because nothing was close
+    from one in which it permitted every change by a hair.
+    """
+
+    gate_margin_samples: int
+    """Number of planning cycles at which the gate bounded the ego's manoeuvre.
+
+    Zero means the margin above is unbounded because the ego never adopted a
+    manoeuvre with a neighbour close enough to measure, not because it had room.
+    """
+
     def as_row(self) -> tuple[str, ...]:
         """The metric values as strings, in reporting order."""
         return (
@@ -124,6 +140,11 @@ class SuiteMetrics:
     def minimum_time_to_collision(self) -> float:
         """Smallest time to collision seen anywhere in the suite."""
         return min(item.minimum_time_to_collision for item in self.scenarios)
+
+    @property
+    def minimum_gate_margin(self) -> float:
+        """Least room the gate left on any manoeuvre in the suite."""
+        return min(item.minimum_gate_margin for item in self.scenarios)
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +214,11 @@ class DensityMetrics:
         """Smallest time to collision seen at this density, over every seed."""
         return min(item.minimum_time_to_collision for item in self.runs)
 
+    @property
+    def minimum_gate_margin(self) -> float:
+        """Least room the gate left at this density, over every seed."""
+        return min(item.minimum_gate_margin for item in self.runs)
+
     def _speed_percentile(self, percentile: float) -> float:
         values = np.array([item.mean_speed for item in self.runs], dtype=np.float64)
         return float(np.percentile(values, percentile))
@@ -241,6 +267,11 @@ class SweepMetrics:
         return min(item.minimum_time_to_collision for item in self.densities)
 
     @property
+    def minimum_gate_margin(self) -> float:
+        """Least room the gate left anywhere in the sweep."""
+        return min(item.minimum_gate_margin for item in self.densities)
+
+    @property
     def slowest_run(self) -> ScenarioMetrics:
         """The run with the lowest mean ego speed, named so it can be reproduced."""
         return min(
@@ -270,6 +301,8 @@ def scenario_metrics(trace: RunTrace) -> ScenarioMetrics:
         ttc_p05=float(np.percentile(ttc, 5.0)) if ttc.size else math.inf,
         ttc_median=float(np.median(ttc)) if ttc.size else math.inf,
         ttc_samples=int(ttc.size),
+        minimum_gate_margin=trace.minimum_gate_margin,
+        gate_margin_samples=len(trace.gate_margins()),
     )
 
 

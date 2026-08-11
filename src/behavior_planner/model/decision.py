@@ -7,6 +7,7 @@ each other while both remain describable by one trace record.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum, unique
 
@@ -174,6 +175,21 @@ class Decision:
     event: BehaviorEvent
     target_lane: int
     candidates: tuple[CandidateScore, ...] = ()
+    gate_margin: float = math.inf
+    """Room the gate left on the state this decision adopts.
+
+    A verdict carries a number as well as a boolean, and the number is how far
+    the manoeuvre sat from whichever threshold bound it, as a fraction of that
+    threshold. Recording only the boolean leaves a run able to report where the
+    gate refused and unable to report how close the manoeuvres it permitted came
+    to being refused, which are the same measurement seen from either side.
+
+    ``inf`` where the gate placed no bound, which is every decision that moves
+    the ego nowhere sideways and every change into an empty lane. Negative in
+    the single case where the gate is overruled: a manoeuvre past
+    :attr:`PlannerConfig.abort_progress_limit` is finished rather than reversed,
+    whatever the gate has come to think of it.
+    """
 
     @property
     def vetoed(self) -> tuple[CandidateScore, ...]:

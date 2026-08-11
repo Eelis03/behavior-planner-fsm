@@ -64,6 +64,8 @@ def main() -> None:
     print(f"lane changes        {metrics.lane_changes}")
     print(f"minimum headway     {metrics.minimum_time_headway:.2f} s")
     print(f"minimum TTC         {metrics.minimum_time_to_collision:.2f} s")
+    print(f"minimum gate margin {metrics.minimum_gate_margin:.3f}")
+    print(f"gated cycles        {metrics.gate_margin_samples}")
 
 
 if __name__ == "__main__":

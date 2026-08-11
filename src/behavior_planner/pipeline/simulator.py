@@ -107,6 +107,7 @@ class TrafficSimulator:
 
             planned = index % plan_every == 0
             veto = VetoReason.NONE
+            margin = math.inf
             if planned:
                 context = DecisionContext(
                     road=road,
@@ -118,6 +119,7 @@ class TrafficSimulator:
                 )
                 decision = self.policy.decide(context)
                 veto = _first_veto(decision)
+                margin = decision.gate_margin
                 state, event = decision.state, decision.event
                 vehicles[_index_of(vehicles, EGO_ID)] = self._apply_decision(
                     road, ego, state, event
@@ -138,6 +140,7 @@ class TrafficSimulator:
                     time=time,
                     acceleration=trajectory[0].acceleration,
                     veto=veto,
+                    margin=margin,
                     planned=planned,
                     overlaps=len(overlaps),
                 )
@@ -329,6 +332,7 @@ class TrafficSimulator:
         time: float,
         acceleration: float,
         veto: VetoReason,
+        margin: float,
         planned: bool,
         overlaps: int,
     ) -> StepRecord:
@@ -364,6 +368,7 @@ class TrafficSimulator:
             time_headway=headway,
             time_to_collision=ttc,
             veto_reason=veto,
+            gate_margin=margin,
             planned=planned,
             collisions=overlaps,
         )
