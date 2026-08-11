@@ -144,9 +144,7 @@ def test_the_weighted_total_is_the_declared_linear_combination() -> None:
     assert terms.weighted_total(weights) == pytest.approx(expected)
 
 
-def test_target_lane_is_clamped_to_the_road(
-    road: Road, config: PlannerConfig
-) -> None:
+def test_target_lane_is_clamped_to_the_road(road: Road, config: PlannerConfig) -> None:
     """Scoring a successor never raises, even where the successor is infeasible."""
     ego = make_ego(road, lane=0, s=0.0, speed=28.0, desired_speed=31.0)
     scene = context(road, ego, state=BehaviorState.KEEP_LANE, config=config)

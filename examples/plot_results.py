@@ -44,9 +44,7 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     """Run what each figure needs and write the three published files."""
     arguments = parse_arguments()
-    scenarios = tuple(
-        scenario for scenario in standard_suite() if scenario.name in TIMELINES
-    )
+    scenarios = tuple(scenario for scenario in standard_suite() if scenario.name in TIMELINES)
     if arguments.duration is not None:
         scenarios = tuple(item.with_duration(arguments.duration) for item in scenarios)
 

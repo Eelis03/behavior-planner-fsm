@@ -48,9 +48,7 @@ def test_the_control_policy_also_produces_no_collisions(
 
 
 @pytest.mark.parametrize("index", range(len(SUITE)))
-def test_every_recorded_state_transition_is_legal(
-    traces: tuple[RunTrace, ...], index: int
-) -> None:
+def test_every_recorded_state_transition_is_legal(traces: tuple[RunTrace, ...], index: int) -> None:
     """No run reaches a state the transition table does not allow."""
     trace = traces[index]
     for previous, current in zip(trace.records, trace.records[1:], strict=False):
@@ -70,9 +68,7 @@ def test_speeds_are_non_negative_and_below_a_physical_bound(
 
 
 @pytest.mark.parametrize("index", range(len(SUITE)))
-def test_the_ego_stays_on_the_carriageway(
-    traces: tuple[RunTrace, ...], index: int
-) -> None:
+def test_the_ego_stays_on_the_carriageway(traces: tuple[RunTrace, ...], index: int) -> None:
     """Lateral offset never leaves the outer lane centres."""
     road = SUITE[index].road
     trace = traces[index]

@@ -113,8 +113,7 @@ class WeightedCostModel:
         if neighbors.leader is None:
             return 0.0
         desired = (
-            self.config.desired_standstill_gap
-            + self.config.desired_leader_headway * ego.speed
+            self.config.desired_standstill_gap + self.config.desired_leader_headway * ego.speed
         )
         return _clip_unit((desired - neighbors.leader.gap) / desired)
 

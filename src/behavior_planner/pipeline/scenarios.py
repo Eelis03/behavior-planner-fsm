@@ -112,9 +112,7 @@ class RandomFill:
         if self.jitter < 0.0:
             raise ValueError(f"jitter must not be negative, got {self.jitter}")
         if self.minimum_clearance <= 0.0:
-            raise ValueError(
-                f"minimum_clearance must be positive, got {self.minimum_clearance}"
-            )
+            raise ValueError(f"minimum_clearance must be positive, got {self.minimum_clearance}")
 
 
 @dataclass(frozen=True, slots=True)

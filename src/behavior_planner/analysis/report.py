@@ -99,9 +99,7 @@ def worst_paired_gain(planned: SweepMetrics, baseline: SweepMetrics) -> tuple[st
     so they can reproduce it.
     """
     control = {
-        item.scenario: item.mean_speed
-        for density in baseline.densities
-        for item in density.runs
+        item.scenario: item.mean_speed for density in baseline.densities for item in density.runs
     }
     gains = [
         (100.0 * (item.mean_speed - control[item.scenario]) / control[item.scenario], item.scenario)

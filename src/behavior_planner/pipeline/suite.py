@@ -59,9 +59,7 @@ def build_planner(config: PlannerConfig) -> FiniteStateBehaviorPlanner:
     """The default behaviour policy at ``config``."""
     return FiniteStateBehaviorPlanner(
         cost=WeightedCostModel(config.cost),
-        gate=GapAndDecelerationGate(
-            limits=config.safety, car_following=IntelligentDriverModel()
-        ),
+        gate=GapAndDecelerationGate(limits=config.safety, car_following=IntelligentDriverModel()),
     )
 
 
@@ -130,8 +128,7 @@ def run_suite(
     chosen = standard_suite() if scenarios is None else scenarios
     runner = run_baseline if baseline else run_scenario
     return tuple(
-        runner(scenario, config=config, simulation=simulation, steps=steps)
-        for scenario in chosen
+        runner(scenario, config=config, simulation=simulation, steps=steps) for scenario in chosen
     )
 
 
@@ -158,8 +155,7 @@ def run_sweep(
             DensityGroup(
                 density=per_lane,
                 traces=tuple(
-                    runner(scenario, config=config, simulation=simulation)
-                    for scenario in scenarios
+                    runner(scenario, config=config, simulation=simulation) for scenario in scenarios
                 ),
             )
         )

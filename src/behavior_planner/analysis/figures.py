@@ -125,9 +125,7 @@ def plot_gate_weight_sweep(samples: Sequence[WeightSample], path: Path) -> Path:
         raise ValueError("the sweep figure needs at least one sample")
 
     weights = [sample.progress_weight for sample in samples]
-    figure, axes = plt.subplots(
-        2, 1, figsize=(7.4, 5.2), sharex=True, height_ratios=(3.0, 1.0)
-    )
+    figure, axes = plt.subplots(2, 1, figsize=(7.4, 5.2), sharex=True, height_ratios=(3.0, 1.0))
 
     axes[0].plot(
         weights,
@@ -141,8 +139,7 @@ def plot_gate_weight_sweep(samples: Sequence[WeightSample], path: Path) -> Path:
     axes[0].set_ylabel("cost preference for\nthe lane change")
     axes[0].grid(alpha=0.3, which="both")
     axes[0].set_title(
-        "The cost function wants the manoeuvre more at every weight, "
-        "and never gets it",
+        "The cost function wants the manoeuvre more at every weight, and never gets it",
         fontsize=10,
     )
 

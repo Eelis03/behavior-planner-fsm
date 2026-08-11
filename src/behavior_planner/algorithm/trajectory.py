@@ -182,9 +182,7 @@ class TrajectoryGenerator:
         elapsed = 0.0 if maneuver is None else maneuver.elapsed
         steps = max(1, round(span / dt))
         for index in range(1, steps + 1):
-            speed, s = ballistic_step(
-                speed=speed, s=s, acceleration=acceleration, dt=dt, road=road
-            )
+            speed, s = ballistic_step(speed=speed, s=s, acceleration=acceleration, dt=dt, road=road)
             elapsed += dt
             if maneuver is None:
                 d = ego.d
@@ -213,9 +211,7 @@ class TrajectoryGenerator:
         for lane in binding_lanes(context.road, context.ego, state):
             leader = context.snapshot.neighbors(context.ego, lane).leader
             if leader is not None:
-                found.append(
-                    (leader.vehicle.s, leader.speed, 0.5 * leader.vehicle.shape.length)
-                )
+                found.append((leader.vehicle.s, leader.speed, 0.5 * leader.vehicle.shape.length))
         return tuple(found)
 
     def _acceleration_at(
